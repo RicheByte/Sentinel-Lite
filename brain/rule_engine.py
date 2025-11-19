@@ -173,9 +173,77 @@ class RuleEngine:
             "active_patterns": sum(len(ips) for ips in self.state.values())
         }
 
-    def reload_rules(self, rules_file: Optional[str] = None):
-        """Reload rules from file"""
-        if rules_file:
-            self.rules = self.load_rules(rules_file)
-        print(f"[+] Rules reloaded: {len(self.rules)} active rules")
+    def get_rules(self) -> List[Dict[str, Any]]:
+        """Get all rules"""
+        return self.rules
+
+    def save_rules(self):
+        """Save rules to JSON file"""
+        try:
+            # Remove compiled patterns before saving
+            rules_to_save = []
+            for rule in self.rules:
+                rule_copy = rule.copy()
+                if "compiled_pattern" in rule_copy:
+                    del rule_copy["compiled_pattern"]
+                rules_to_save.append(rule_copy)
+            
+            with open("brain/rules.json", 'w') as f:
+                json.dump(rules_to_save, f, indent=2)
+            print(f"[+] Rules saved: {len(self.rules)} active rules")
+        except Exception as e:
+            print(f"[!] Error saving rules: {e}")
+
+    def add_rule(self, rule_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a new rule"""
+        # Generate ID if not present
+        if "id" not in rule_data:
+            max_id = max([r.get("id", 0) for r in self.rules]) if self.rules else 0
+            rule_data["id"] = max_id + 1
+        
+        # Set defaults
+        rule_data.setdefault("enabled", True)
+        rule_data.setdefault("threshold", 1)
+        rule_data.setdefault("time_window", 60)
+        rule_data.setdefault("priority", 5)
+        
+        # Compile regex if needed
+        if rule_data.get("condition_type") == "regex" and "pattern" in rule_data:
+            try:
+                rule_data["compiled_pattern"] = re.compile(rule_data["pattern"], re.IGNORECASE)
+            except re.error:
+                pass
+
+        self.rules.append(rule_data)
+        self.save_rules()
+        return rule_data
+
+    def update_rule(self, rule_id: int, rule_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update an existing rule"""
+        for i, rule in enumerate(self.rules):
+            if rule.get("id") == rule_id:
+                # Update fields
+                updated_rule = {**rule, **rule_data}
+                
+                # Recompile regex if needed
+                if updated_rule.get("condition_type") == "regex" and "pattern" in updated_rule:
+                    try:
+                        updated_rule["compiled_pattern"] = re.compile(updated_rule["pattern"], re.IGNORECASE)
+                    except re.error:
+                        pass
+                
+                self.rules[i] = updated_rule
+                self.save_rules()
+                return updated_rule
+        return None
+
+    def delete_rule(self, rule_id: int) -> bool:
+        """Delete a rule"""
+        initial_len = len(self.rules)
+        self.rules = [r for r in self.rules if r.get("id") != rule_id]
+        
+        if len(self.rules) < initial_len:
+            self.save_rules()
+            return True
+        return False
 

@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import LogStream from './components/LogStream';
-import AlertsPanel from './components/AlertsPanel';
-import StatsChart from './components/StatsChart';
-import { ShieldCheck, Wifi, WifiOff } from 'lucide-react';
+import Sidebar from './components/layout/Sidebar';
+import Dashboard from './pages/Dashboard';
+import AlertsPage from './pages/AlertsPage';
+import LogsPage from './pages/LogsPage';
+import RulesPage from './pages/RulesPage';
+import SettingsPage from './pages/SettingsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+
 import { useWebSocket } from './hooks/useWebSocket';
+import { useNotifications } from './hooks/useNotifications';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -23,6 +29,9 @@ function App() {
     alerts_by_severity: {}
   });
 
+  // Initialize notifications hook
+  const { sendNotification, permission } = useNotifications();
+
   // WebSocket message handler
   const handleWebSocketMessage = useCallback((data) => {
     console.log('WebSocket message:', data);
@@ -33,21 +42,31 @@ function App() {
         break;
 
       case 'new_alert':
-        setAlerts(prevAlerts => [data.data, ...prevAlerts].slice(0, 50)); // Keep last 50 alerts
-        // Show toast notification for critical alerts
-        if (data.data.severity === 'critical') {
-          toast.error(`🚨 CRITICAL: ${data.data.rule_name}`, {
-            position: "top-right",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-        } else if (data.data.severity === 'high') {
-          toast.warn(`⚠️ ${data.data.rule_name}`, {
-            position: "top-right",
-            autoClose: 4000,
+        const alert = data.data;
+        setAlerts(prevAlerts => [alert, ...prevAlerts]);
+        
+        // Show toast notification
+        const toastOptions = {
+          position: "top-right",
+          autoClose: alert.severity === 'CRITICAL' ? false : 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        };
+
+        if (alert.severity === 'CRITICAL') {
+          toast.error(`🚨 CRITICAL: ${alert.description}`, toastOptions);
+        } else if (alert.severity === 'HIGH') {
+          toast.warn(`⚠️ HIGH: ${alert.description}`, toastOptions);
+        }
+
+        // Send desktop notification for critical/high severity
+        if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') {
+          sendNotification({
+            title: `${alert.severity} Alert`,
+            body: alert.description,
+            severity: alert.severity
           });
         }
         break;
@@ -59,143 +78,95 @@ function App() {
       default:
         console.log('Unknown message type:', data.type);
     }
-  }, []);
+  }, [sendNotification]);
 
-  const { isConnected, reconnectAttempt } = useWebSocket(handleWebSocketMessage);
+  // Initialize WebSocket
+  const { isConnected } = useWebSocket(handleWebSocketMessage);
 
-  // Initial data fetch (fallback for when WebSocket is not connected)
-  const fetchData = async () => {
-    try {
-      const [logsRes, alertsRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/logs?limit=100`),
-        fetch(`${API_BASE}/alerts?limit=50`),
-        fetch(`${API_BASE}/stats`)
-      ]);
-
-      if (logsRes.ok) setLogs(await logsRes.json());
-      if (alertsRes.ok) setAlerts(await alertsRes.json());
-      if (statsRes.ok) setStats(await statsRes.json());
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      toast.error("Failed to fetch data from server");
-    }
-  };
-
-  // Fetch initial data on mount
+  // Fetch initial data
   useEffect(() => {
-    fetchData();
-  }, []);
+    const fetchInitialData = async () => {
+      try {
+        const [logsRes, alertsRes, statsRes] = await Promise.all([
+          fetch(`${API_BASE}/logs?limit=100`),
+          fetch(`${API_BASE}/alerts?limit=50`),
+          fetch(`${API_BASE}/stats`)
+        ]);
 
-  // Fallback polling when WebSocket is not connected
-  useEffect(() => {
-    let interval;
-    if (!isConnected) {
-      // Poll every 5 seconds when WebSocket is down
-      interval = setInterval(fetchData, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
+        if (logsRes.ok) {
+          const logsData = await logsRes.json();
+          setLogs(logsData);
+        }
+
+        if (alertsRes.ok) {
+          const alertsData = await alertsRes.json();
+          setAlerts(alertsData);
+        }
+
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+        toast.error('Failed to connect to backend');
+      }
     };
-  }, [isConnected]);
+
+    fetchInitialData();
+  }, []);
 
   // Handle alert acknowledgment
-  const handleAcknowledgeAlert = async (alertId, acknowledgedBy) => {
+  const handleAcknowledgeAlert = async (alertId) => {
     try {
       const response = await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ acknowledged_by: acknowledgedBy })
+        method: 'POST'
       });
 
       if (response.ok) {
-        // Update local state
         setAlerts(prevAlerts =>
           prevAlerts.map(alert =>
-            alert.id === alertId
-              ? { ...alert, acknowledged: true, acknowledged_by: acknowledgedBy, acknowledged_at: new Date().toISOString() }
-              : alert
+            alert.id === alertId ? { ...alert, acknowledged: true } : alert
           )
         );
         toast.success('Alert acknowledged');
-        // Refresh stats
-        const statsRes = await fetch(`${API_BASE}/stats`);
-        if (statsRes.ok) setStats(await statsRes.json());
-      } else {
-        toast.error('Failed to acknowledge alert');
       }
     } catch (error) {
-      console.error('Error acknowledging alert:', error);
+      console.error('Failed to acknowledge alert:', error);
       toast.error('Failed to acknowledge alert');
     }
   };
 
+  // Common props for all pages
+  const pageProps = {
+    logs,
+    alerts,
+    stats,
+    isConnected,
+    onAcknowledgeAlert: handleAcknowledgeAlert
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
-      <ToastContainer theme="dark" />
-      
-      <header className="mb-8 flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="relative">
-            <ShieldCheck className="w-10 h-10 text-blue-500 mr-3" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-              Sentinel-Lite
-            </h1>
-            <p className="text-gray-400 text-sm">Advanced SIEM Dashboard v2.0</p>
-          </div>
-        </div>
+    <Router>
+      <div className="flex min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        <ToastContainer theme="dark" position="top-right" />
         
-        <div className="flex items-center gap-4">
-          {/* WebSocket Status */}
-          <div className="flex items-center gap-2 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-            {isConnected ? (
-              <>
-                <Wifi className="w-4 h-4 text-green-400 animate-pulse" />
-                <span className="text-green-400 text-sm font-semibold">Live</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-4 h-4 text-red-400" />
-                <span className="text-red-400 text-sm font-semibold">
-                  {reconnectAttempt > 0 ? `Reconnecting... (${reconnectAttempt})` : 'Disconnected'}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* System Status */}
-          <div className="text-right bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-            <div className="text-sm text-gray-400">System Status</div>
-            <div className="flex items-center text-green-400 font-semibold">
-              <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-              Active
-            </div>
-          </div>
+        {/* SIDEBAR */}
+        <Sidebar />
+        
+        {/* MAIN CONTENT */}
+        <div className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/" element={<Dashboard {...pageProps} />} />
+            <Route path="/alerts" element={<AlertsPage alerts={alerts} onAcknowledge={handleAcknowledgeAlert} />} />
+            <Route path="/logs" element={<LogsPage logs={logs} />} />
+            <Route path="/rules" element={<RulesPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
         </div>
-      </header>
-
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Stats & Alerts */}
-        <div className="lg:col-span-1 space-y-6">
-          <StatsChart stats={stats} />
-          <AlertsPanel alerts={alerts} onAcknowledge={handleAcknowledgeAlert} />
-        </div>
-
-        {/* Right Column: Logs */}
-        <div className="lg:col-span-2">
-          <LogStream logs={logs} />
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="mt-8 text-center text-gray-500 text-sm">
-        <p>Sentinel-Lite © 2024 | Real-time Security Information & Event Management</p>
-      </footer>
-    </div>
+      </div>
+    </Router>
   );
 }
 

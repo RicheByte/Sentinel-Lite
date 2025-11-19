@@ -68,8 +68,7 @@ services:
       - API_URL=http://brain:8000/api/ingest
       - PYTHONUNBUFFERED=1
     depends_on:
-      brain:
-        condition: service_healthy
+      - brain
     restart: unless-stopped
     networks:
       - sentinel-network

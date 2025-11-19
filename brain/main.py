@@ -13,6 +13,9 @@ from cache import cache
 from geoip import geoip
 from websocket_manager import manager
 from middleware import setup_middlewares, limiter, logger
+from notifications import notification_manager
+from notifications.email import EmailNotificationHandler
+from notifications.webhook import WebhookNotificationHandler
 
 # Initialize DB and Rule Engine
 init_db()
@@ -26,6 +29,15 @@ app = FastAPI(
 
 # Setup middlewares (logging, security, rate limiting)
 setup_middlewares(app, enable_auth=False)  # Set to True to enable API key auth
+
+# Initialize notification handlers (optional, configured via environment variables)
+# Email notifications (configure SMTP_* environment variables to enable)
+email_handler = EmailNotificationHandler()
+notification_manager.register_handler(email_handler)
+
+# Webhook notifications (configure WEBHOOK_URL to enable)
+webhook_handler = WebhookNotificationHandler()
+notification_manager.register_handler(webhook_handler)
 
 # CORS
 app.add_middleware(
@@ -102,10 +114,14 @@ async def process_log_async(log_data: dict, db: Session):
                 source_ip=alert_data["source_ip"]
             )
             db.add(new_alert)
-            logger.warning(f"ALERT: {alert_data['rule_name']} from {alert_data['source_ip']}")
+            # Flush to generate ID before broadcasting
+            db.flush()
+            db.refresh(new_alert)
             
-            # Broadcast alert to WebSocket clients
-            await manager.broadcast_alert({
+            logger.warning(f"ALERT: {alert_data['rule_name']} (ID: {new_alert.id}) from {alert_data['source_ip']}")
+            
+            # Broadcast alert to WebSocket clients (now with valid ID)
+            alert_payload = {
                 "id": new_alert.id,
                 "timestamp": new_alert.timestamp.isoformat(),
                 "rule_name": new_alert.rule_name,
@@ -113,7 +129,11 @@ async def process_log_async(log_data: dict, db: Session):
                 "description": new_alert.description,
                 "source_ip": new_alert.source_ip,
                 "acknowledged": False
-            })
+            }
+            await manager.broadcast_alert(alert_payload)
+            
+            # Send notifications via configured channels (email, webhook, etc.)
+            await notification_manager.send_alert(alert_payload)
         
         db.commit()
         
@@ -289,6 +309,64 @@ async def acknowledge_alert(
     logger.info(f"Alert {alert_id} acknowledged by {ack_data.acknowledged_by}")
     
     return {"status": "acknowledged", "alert_id": alert_id}
+
+# Rule Management Models
+class RuleCreate(BaseModel):
+    rule_name: str
+    condition_type: str = "substring"  # substring, regex, exact
+    condition: str
+    pattern: Optional[str] = None
+    severity: str = "medium"
+    threshold: int = 1
+    time_window: int = 60
+    enabled: bool = True
+    priority: int = 5
+    description: Optional[str] = None
+
+class RuleUpdate(BaseModel):
+    rule_name: Optional[str] = None
+    condition_type: Optional[str] = None
+    condition: Optional[str] = None
+    pattern: Optional[str] = None
+    severity: Optional[str] = None
+    threshold: Optional[int] = None
+    time_window: Optional[int] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+    description: Optional[str] = None
+
+# Rule Management Endpoints
+@app.get("/api/rules")
+async def get_rules():
+    """Get all detection rules"""
+    return rule_engine.get_rules()
+
+@app.post("/api/rules")
+async def create_rule(rule: RuleCreate):
+    """Create a new detection rule"""
+    rule_data = rule.dict(exclude_unset=True)
+    new_rule = rule_engine.add_rule(rule_data)
+    return new_rule
+
+@app.put("/api/rules/{rule_id}")
+async def update_rule(rule_id: int, rule: RuleUpdate):
+    """Update an existing detection rule"""
+    rule_data = rule.dict(exclude_unset=True)
+    updated_rule = rule_engine.update_rule(rule_id, rule_data)
+    
+    if not updated_rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    
+    return updated_rule
+
+@app.delete("/api/rules/{rule_id}")
+async def delete_rule(rule_id: int):
+    """Delete a detection rule"""
+    success = rule_engine.delete_rule(rule_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    
+    return {"status": "deleted", "rule_id": rule_id}
 
 # Get statistics
 @app.get("/api/stats", response_model=StatsOut)
