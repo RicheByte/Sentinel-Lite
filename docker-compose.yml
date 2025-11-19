@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - sentinel-network
+
+  brain:
+    build: ./brain
+    container_name: sentinel-brain
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./brain:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_URL=sqlite:///./sentinel.db
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sentinel-network
+
+  eye:
+    build: ./eye
+    container_name: sentinel-eye
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=http://localhost:8000/api
+      - VITE_WS_URL=ws://localhost:8000/ws
+    depends_on:
+      - brain
+    restart: unless-stopped
+    networks:
+      - sentinel-network
+
+  agent:
+    build: ./agent
+    container_name: sentinel-agent
+    command: python agent/log_shipper.py
+    volumes:
+      - .:/app
+    environment:
+      - API_URL=http://brain:8000/api/ingest
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      brain:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sentinel-network
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  sentinel-network:
+    driver: bridge
+

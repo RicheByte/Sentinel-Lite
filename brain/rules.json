@@ -1,0 +1,134 @@
+[
+  {
+    "rule_name": "Brute Force Attack",
+    "condition": "failed password",
+    "condition_type": "substring",
+    "threshold": 5,
+    "time_window": 60,
+    "severity": "critical",
+    "priority": 1,
+    "description": "Multiple failed login attempts detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "SQL Injection Attempt",
+    "condition_type":" regex",
+    "pattern": "(union.*select|select.*from|insert.*into|delete.*from|drop.*table|'\\s*(or|and)\\s*['\"]?\\d|exec(\\s|\\()|(;|\\||\\&)\\s*(ls|cat|wget|curl))",
+    "threshold": 1,
+    "time_window": 60,
+    "severity": "critical",
+    "priority": 1,
+    "description": "Potential SQL injection attack detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "XSS Attack Attempt",
+    "condition_type": "regex",
+    "pattern": "(<script|javascript:|onerror=|onload=|<iframe|eval\\(|alert\\()",
+    "threshold": 1,
+    "time_window": 60,
+    "severity": "high",
+    "priority": 2,
+    "description": "Potential XSS attack detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Port Scanning",
+    "condition": "connection refused",
+    "condition_type": "substring",
+    "threshold": 10,
+    "time_window": 30,
+    "severity": "high",
+    "priority": 2,
+    "description": "Possible port scanning activity detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Suspicious User Agent",
+    "condition_type": "regex",
+    "pattern": "(nikto|sqlmap|nmap|masscan|metasploit|burp|acunetix|nessus|openvas)",
+    "threshold": 1,
+    "time_window": 60,
+    "severity": "high",
+    "priority": 2,
+    "description": "Suspicious scanning tool user agent detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Path Traversal Attempt",
+    "condition_type": "regex",
+    "pattern": "(\\.\\./|\\.\\.\\\\|/etc/passwd|/etc/shadow|c:\\\\windows)",
+    "threshold": 1,
+    "time_window": 60,
+    "severity": "high",
+    "priority": 2,
+    "description": "Path traversal attack attempt detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Command Injection",
+    "condition_type": "regex",
+    "pattern": "(;\\s*(ls|cat|wget|curl|nc|bash|sh|powershell)|\\|\\s*(ls|cat|wget))",
+    "threshold": 1,
+    "time_window": 60,
+    "severity": "critical",
+    "priority": 1,
+    "description": "Command injection attempt detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Authentication Failure Spike",
+    "condition": "authentication failed",
+    "condition_type": "substring",
+    "threshold": 10,
+    "time_window": 120,
+    "severity": "medium",
+    "priority": 3,
+    "description": "Elevated authentication failures detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Access to Sensitive Files",
+    "condition_type": "regex",
+    "pattern": "(/admin|/config|/backup|\\.env|\\.git|/\\.aws|wp-admin|phpmyadmin)",
+    "threshold": 3,
+    "time_window": 60,
+    "severity": "medium",
+    "priority": 3,
+    "description": "Repeated access attempts to sensitive paths",
+    "enabled": true
+  },
+  {
+    "rule_name": "HTTP 404 Flood",
+    "condition": "404",
+    "condition_type": "substring",
+    "threshold": 20,
+    "time_window": 60,
+    "severity": "low",
+    "priority": 4,
+    "description": "High volume of 404 errors (possible scanning)",
+    "enabled": true
+  },
+  {
+    "rule_name": "HTTP 500 Errors",
+    "condition": "500 internal server error",
+    "condition_type": "substring",
+    "threshold": 5,
+    "time_window": 60,
+    "severity": "medium",
+    "priority": 3,
+    "description": "Multiple server errors detected",
+    "enabled": true
+  },
+  {
+    "rule_name": "Privilege Escalation Attempt",
+    "condition_type": "regex",
+    "pattern": "(sudo|su\\s|chmod\\s777|chown\\sroot)",
+    "threshold": 1,
+    "time_window": 60,
+    "severity": "critical",
+    "priority": 1,
+    "description": "Potential privilege escalation detected",
+    "enabled": true
+  }
+]
