@@ -7,9 +7,9 @@
 
 **Sentinel-Lite** is a powerful, lightweight Security Information and Event Management (SIEM) system designed for real-time log monitoring, threat detection, and security analytics.
 
-## ✨ Features
+##  Features
 
-### 🔒 Security Monitoring
+###  Security Monitoring
 
 - **Real-time Log Ingestion** - WebSocket-based live log streaming
 - **Advanced Threat Detection** - 12+ pre-configured security rules
@@ -17,7 +17,7 @@
 - **Anomaly Detection** - Statistical analysis for unusual patterns
 - **GeoIP Enrichment** - Automatic IP geolocation and mapping
 
-### 📊 Visualization & Analytics
+###  Visualization & Analytics
 
 - **Interactive Dashboard** - Real-time metrics and charts
 - **Alert Management** - Severity-based filtering and acknowledgment
@@ -25,7 +25,7 @@
 - **Top Source IPs** - Identify most active sources
 - **Export Capabilities** - CSV and JSON export for logs
 
-### 🚀 Performance
+###  Performance
 
 - **Redis Caching** - Ultra-fast data retrieval
 - **WebSocket Streaming** - Sub-second latency updates
@@ -33,7 +33,7 @@
 - **Async Processing** - Non-blocking log analysis
 - **Rate Limiting** - API protection and throttling
 
-### 🛡️ Detection Coverage
+###  Detection Coverage
 
 - Brute force attacks
 - SQL injection attempts
@@ -45,7 +45,7 @@
 - Suspicious user agents
 - And more...
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
@@ -61,7 +61,7 @@
                      └─────────────┘
 ```
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 
@@ -127,7 +127,7 @@ pip install -r requirements.txt
 python log_shipper.py
 ```
 
-## ⚙️ Configuration
+##  Configuration
 
 ### Environment Variables
 
@@ -200,7 +200,7 @@ Edit `brain/rules.json` to add custom detection rules:
 
 Full API documentation available at: http://localhost:8000/docs
 
-## 🧪 Testing
+##  Testing
 
 ### Run Brute Force Simulation
 
@@ -210,11 +210,11 @@ python tests/brute_force_gen.py
 
 This generates failed login attempts to trigger brute force detection alerts.
 
-## 📸 Screenshots
+##  Screenshots
 
 _(Dashboard screenshots would go here)_
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Backend
 
@@ -237,14 +237,14 @@ _(Dashboard screenshots would go here)_
 - **Docker** - Containerization
 - **Docker Compose** - Multi-container orchestration
 
-## 📊 Performance Benchmarks
+##  Performance Benchmarks
 
 - **Log Ingestion**: 10,000+ logs/second
 - **API Response**: <100ms (cached queries)
 - **WebSocket Latency**: <500ms
 - **Frontend Load**: <2 seconds
 
-## 🗺️ Roadmap
+##  Roadmap
 
 - [ ] Machine learning-based anomaly detection
 - [ ] Multi-tenancy support
@@ -254,21 +254,21 @@ _(Dashboard screenshots would go here)_
 - [ ] Elasticsearch integration
 - [ ] MITRE ATT&CK framework mapping
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
+##  License
 
 MIT License - see LICENSE file for details
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - MaxMind for GeoLite2 database
 - FastAPI community
 - React ecosystem
 
-## 📞 Support
+##  Support
 
 For issues and questions, please open an issue on GitHub.
 
